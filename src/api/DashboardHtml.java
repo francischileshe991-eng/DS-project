@@ -216,22 +216,9 @@ public final class DashboardHtml {
     }
     .ring-orbit {
       stroke: var(--border);
-      stroke-width: 1.5;
+      stroke-width: 2;
       stroke-dasharray: 4 4;
       fill: none;
-    }
-    .ring-active-orbit {
-      stroke: var(--purple);
-      stroke-width: 2;
-      stroke-dasharray: 6 6;
-      fill: none;
-      animation: rotateRing 20s linear infinite;
-      transform-origin: center;
-      opacity: 0.4;
-    }
-    @keyframes rotateRing {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
     }
 
     /* Telemetry Counters */
@@ -771,7 +758,21 @@ public final class DashboardHtml {
       let svgContent = '';
       // Base orbital track
       svgContent += `<circle cx="${centerX}" cy="${centerY}" r="${radius}" class="ring-orbit" />`;
-      svgContent += `<circle cx="${centerX}" cy="${centerY}" r="${radius}" class="ring-active-orbit" />`;
+      // Invisible motion path for traveling key token (clockwise circle starting at top)
+      svgContent += `<path id="ring-track" d="M ${centerX} ${centerY - radius} A ${radius} ${radius} 0 1 1 ${centerX - 0.01} ${centerY - radius} Z" fill="none" stroke="none" />`;
+
+      // Physically traveling Token Beacon with glowing Key icon 🔑
+      svgContent += `
+      <g>
+        <circle r="14" fill="rgba(168, 85, 247, 0.35)" stroke="#c084fc" stroke-width="2">
+          <animate attributeName="r" values="12;16;12" dur="1s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0.8;0.4;0.8" dur="1s" repeatCount="indefinite" />
+        </circle>
+        <text font-size="14" text-anchor="middle" dominant-baseline="central">🔑</text>
+        <animateMotion dur="5s" repeatCount="indefinite">
+          <mpath href="#ring-track"/>
+        </animateMotion>
+      </g>`;
 
       // Draw connection lines and nodes
       for (let i = 0; i < totalNodes; i++) {
@@ -783,8 +784,8 @@ public final class DashboardHtml {
         const isLeader = (i === status.leader);
         const hasToken = (isSelf && status.has_token);
 
-        let nodeColor = '#334155';
-        let strokeColor = 'rgba(255,255,255,0.15)';
+        let nodeColor = '#1e293b';
+        let strokeColor = 'rgba(255,255,255,0.2)';
         let textColor = '#cbd5e1';
 
         if (isSelf) {
@@ -796,26 +797,27 @@ public final class DashboardHtml {
           strokeColor = '#f59e0b';
         }
 
-        // Outer pulse ring if token is here
+        // Outer pulse ring if token is currently held in CS by this node
         if (hasToken) {
-          svgContent += `<circle cx="${nx}" cy="${ny}" r="22" fill="none" stroke="#a855f7" stroke-width="2" opacity="0.6">
-            <animate attributeName="r" values="18;26;18" dur="1.6s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0.8;0;0.8" dur="1.6s" repeatCount="indefinite" />
+          svgContent += `<circle cx="${nx}" cy="${ny}" r="24" fill="rgba(168, 85, 247, 0.25)" stroke="#a855f7" stroke-width="2.5">
+            <animate attributeName="r" values="20;28;20" dur="1.4s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="1;0.4;1" dur="1.4s" repeatCount="indefinite" />
           </circle>`;
         }
 
         // Main node bubble
-        svgContent += `<circle cx="${nx}" cy="${ny}" r="16" fill="${nodeColor}" stroke="${strokeColor}" stroke-width="2.5" />`;
+        svgContent += `<circle cx="${nx}" cy="${ny}" r="17" fill="${nodeColor}" stroke="${strokeColor}" stroke-width="2.5" />`;
         svgContent += `<text x="${nx}" y="${ny + 4}" font-family="var(--mono)" font-size="11" font-weight="700" fill="${textColor}" text-anchor="middle">N${i}</text>`;
 
-        // Crown on leader
+        // Crown and title on leader
         if (isLeader) {
-          svgContent += `<text x="${nx}" y="${ny - 20}" font-size="12" text-anchor="middle">👑</text>`;
+          svgContent += `<text x="${nx}" y="${ny - 22}" font-size="13" text-anchor="middle">👑</text>`;
+          svgContent += `<text x="${nx}" y="${ny - 33}" font-family="var(--mono)" font-size="8" font-weight="700" fill="#f59e0b" text-anchor="middle">LEADER</text>`;
         }
 
         // Token badge
         if (hasToken) {
-          svgContent += `<text x="${nx}" y="${ny + 26}" font-size="10" text-anchor="middle">🔑</text>`;
+          svgContent += `<text x="${nx}" y="${ny + 30}" font-family="var(--mono)" font-size="9" font-weight="700" fill="#d8b4fe" text-anchor="middle">🔑 IN CS</text>`;
         }
       }
 
