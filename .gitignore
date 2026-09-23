@@ -1,3 +1,7 @@
 out/
 logs/
 *.log
+
+# Machine-specific cluster configuration
+cluster.cfg
+!cluster.cfg.example

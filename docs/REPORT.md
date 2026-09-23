@@ -2,7 +2,7 @@
 **Course**: CSC 4722 – Distributed Systems  
 **Academic Year**: 2026  
 **Institution**: University of Zambia (UNZA) – Department of Computer Science  
-**System Platform**: Pure Java 11+ (zero third-party frameworks/dependencies)  
+**System Platform**: Pure Java 17+ (LTS recommended; minimum JDK 15 for text blocks, zero third-party frameworks/dependencies)  
 
 ---
 

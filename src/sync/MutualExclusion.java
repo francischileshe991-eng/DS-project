@@ -234,8 +234,8 @@ public class MutualExclusion {
                     break;
                 }
                 Object seen = s.get("token_seen_ms");
-                if (seen instanceof Number n) {
-                    newestActivity = Math.max(newestActivity, n.longValue());
+                if (seen instanceof Number) {
+                    newestActivity = Math.max(newestActivity, ((Number) seen).longValue());
                 }
             } catch (Exception ignore) {
                 // malformed status payload; ignore this peer

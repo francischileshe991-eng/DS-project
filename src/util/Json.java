@@ -29,7 +29,7 @@ public final class Json {
 
     public static String stringify(Object o) {
         if (o == null) return "null";
-        if (o instanceof String s) return "\"" + escape(s) + "\"";
+        if (o instanceof String) return "\"" + escape((String) o) + "\"";
         if (o instanceof Boolean || o instanceof Number) return String.valueOf(o);
         if (o instanceof Map<?, ?>) {
             StringBuilder sb = new StringBuilder("{");
@@ -79,8 +79,8 @@ public final class Json {
 
     public static int asInt(Map<String, Object> m, String key) {
         Object v = m.get(key);
-        if (v instanceof Number n) return n.intValue();
-        if (v instanceof String s) return Integer.parseInt(s);
+        if (v instanceof Number) return ((Number) v).intValue();
+        if (v instanceof String) return Integer.parseInt((String) v);
         throw new IllegalArgumentException("Missing or non-numeric int field: " + key);
     }
 

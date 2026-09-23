@@ -1,7 +1,7 @@
 ## 🚀 Quick Start Guide
 
 ### 1. Prerequisites
-- Java Development Kit (JDK 11 or higher). Java 22 is installed and verified.
+- Java Development Kit (JDK 17 LTS or higher recommended, minimum JDK 15; verified on Java 17, 21, and 22).
 - PowerShell 7 or Windows PowerShell.
 
 ### 2. Automated Compilation & Cluster Launch

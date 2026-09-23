@@ -144,7 +144,7 @@ public class ChatHandler implements HttpHandler {
             Object scores = payload.get("scores");
             if (scores != null) scoresJson = Json.stringify(scores);
             Object g = payload.get("gen");
-            if (g instanceof Number n) gen = n.intValue();
+            if (g instanceof Number) gen = ((Number) g).intValue();
         } catch (Exception ignore) {
             // No scores/generation payload carried
         }
