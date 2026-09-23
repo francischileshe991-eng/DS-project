@@ -68,8 +68,8 @@ Write-Host "Cluster Status Summary:" -ForegroundColor Yellow
 for ($id = 0; $id -lt $Nodes; $id++) {
     $port = $BasePort + $id
     $status = Invoke-RestMethod -Uri "http://localhost:$port/api/status"
-    $leadText = if ($status.is_leader) { "[👑 LEADER]" } else { "Leader: Node $($status.leader)" }
-    $tokText = if ($status.has_token) { "[🔑 TOKEN]" } else { "" }
+    $leadText = if ($status.is_leader) { "[LEADER]" } else { "Leader: Node $($status.leader)" }
+    $tokText = if ($status.has_token) { "[TOKEN]" } else { "" }
     Write-Host "  Node $id (Port $port) -> Lamport: $($status.lamport) | Vector: $(ConvertTo-Json -Compress $status.vector) | $leadText $tokText" -ForegroundColor White
 }
 

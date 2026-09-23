@@ -44,6 +44,33 @@ To gracefully shut down all background cluster nodes:
 
 ---
 
+### 🌐 Multi-Machine Setup (Running Across Separate Laptops / PCs)
+
+The system supports running across distinct physical computers on the same local network (Wi-Fi, Ethernet, or Mobile Hotspot):
+
+1. **Connect all computers** to the same network (e.g. your phone's Wi-Fi hotspot).
+2. **Find each machine's IP address** by running `ipconfig` in PowerShell (look for `IPv4 Address`).
+3. **Configure `cluster.cfg`** on all machines with their respective IPs:
+   ```properties
+   node.0=192.168.1.10:8000
+   node.1=192.168.1.11:8000
+   node.2=192.168.1.12:8000
+   ```
+4. **Compile the code** on each machine:
+   ```powershell
+   .\scripts\compile.ps1
+   ```
+5. **Launch the respective node** on each laptop:
+   - **Laptop 1 (Node 0)**: `java -cp out Node 0`
+   - **Laptop 2 (Node 1)**: `java -cp out Node 1`
+   - **Laptop 3 (Node 2)**: `java -cp out Node 2`
+6. **Open the Web Dashboard**: Open `http://<machine-ip>:8000/` in any browser or phone connected to the hotspot. All chat messages, vector clocks, leader elections, and shared scoreboard updates synchronize live across the network!
+
+> [!TIP]
+> When prompted by Windows Defender Firewall, check **Allow access** for Java on Private and Public networks.
+
+---
+
 ## 📂 Project Architecture
 
 ```

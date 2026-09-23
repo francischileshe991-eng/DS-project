@@ -1,0 +1,28 @@
+# ==============================================================================
+# UNZA CSC 4722 — Distributed Systems P2P Cluster Configuration
+# ==============================================================================
+# Define the network endpoint (host:port) for each node in the cluster.
+# Format: node.<id>=<host>:<port>  OR  <id>=<host>:<port>
+#
+# ------------------------------------------------------------------------------
+# SCENARIO A: Multi-Laptop Setup (Across Different PCs on Same Wi-Fi / Hotspot)
+# ------------------------------------------------------------------------------
+# 1. Connect all laptops to the same Wi-Fi or phone Mobile Hotspot.
+# 2. On each laptop, open PowerShell and run 'ipconfig' to find its IPv4 address.
+# 3. Enter the respective IP addresses below:
+#
+# node.0=192.168.1.10:8000
+# node.1=192.168.1.11:8000
+# node.2=192.168.1.12:8000
+#
+# 4. Launch the respective node on each laptop:
+#    Laptop A: java -cp out Node 0
+#    Laptop B: java -cp out Node 1
+#    Laptop C: java -cp out Node 2
+#
+# ------------------------------------------------------------------------------
+# SCENARIO B: Single-Laptop Simulation (Default Localhost Cluster)
+# ------------------------------------------------------------------------------
+node.0=127.0.0.1:8000
+node.1=127.0.0.1:8001
+node.2=127.0.0.1:8002

@@ -28,8 +28,14 @@ public final class NetworkClient {
         }
     }
 
+    public static boolean postTo(String baseUrl, String path, String json) {
+        String base = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        String p = path.startsWith("/") ? path : "/" + path;
+        return post(base + p, json);
+    }
+
     public static boolean postTo(int port, String path, String json) {
-        return post("http://localhost:" + port + path, json);
+        return postTo("http://localhost:" + port, path, json);
     }
 
     public static boolean get(String url) {
@@ -45,9 +51,9 @@ public final class NetworkClient {
         }
     }
 
-    public static String getBody(int port, String path) {
+    public static String getBody(String url) {
         try {
-            HttpRequest req = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+            HttpRequest req = HttpRequest.newBuilder(URI.create(url))
                     .timeout(REQUEST_TIMEOUT)
                     .GET()
                     .build();
@@ -58,7 +64,22 @@ public final class NetworkClient {
         }
     }
 
+    public static String getBody(String baseUrl, String path) {
+        String base = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        String p = path.startsWith("/") ? path : "/" + path;
+        return getBody(base + p);
+    }
+
+    public static String getBody(int port, String path) {
+        return getBody("http://localhost:" + port, path);
+    }
+
+    public static boolean isAlive(String baseUrl) {
+        String base = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        return get(base + "/api/health");
+    }
+
     public static boolean isAlive(int port) {
-        return get("http://localhost:" + port + "/api/health");
+        return isAlive("http://localhost:" + port);
     }
 }

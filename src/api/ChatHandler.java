@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpHandler;
 import models.Clock;
 import models.Message;
 import models.MessageLog;
+import models.Peer;
 import models.Scoreboard;
 import sync.Election;
 import sync.MutualExclusion;
@@ -20,18 +21,20 @@ import java.util.Map;
 public class ChatHandler implements HttpHandler {
     private final int nodeId;
     private final int port;
-    private final List<Integer> peerPorts;
+    private final String host;
+    private final List<Peer> peers;
     private final Clock clock;
     private final MessageLog log;
     private final Scoreboard scoreboard;
     private final MutualExclusion mutex;
     private final Election election;
 
-    public ChatHandler(int nodeId, int port, List<Integer> peerPorts, Clock clock, MessageLog log,
+    public ChatHandler(int nodeId, int port, String host, List<Peer> peers, Clock clock, MessageLog log,
                        Scoreboard scoreboard, MutualExclusion mutex, Election election) {
         this.nodeId = nodeId;
         this.port = port;
-        this.peerPorts = new ArrayList<>(peerPorts);
+        this.host = (host == null || host.isBlank()) ? "localhost" : host.trim();
+        this.peers = new ArrayList<>(peers);
         this.clock = clock;
         this.log = log;
         this.scoreboard = scoreboard;
@@ -39,9 +42,23 @@ public class ChatHandler implements HttpHandler {
         this.election = election;
     }
 
+    public ChatHandler(int nodeId, int port, List<Peer> peers, Clock clock, MessageLog log,
+                       Scoreboard scoreboard, MutualExclusion mutex, Election election) {
+        this(nodeId, port, "localhost", peers, clock, log, scoreboard, mutex, election);
+    }
+
     public ChatHandler(int nodeId, Clock clock, MessageLog log, Scoreboard scoreboard,
                        MutualExclusion mutex, Election election) {
-        this(nodeId, 8000 + nodeId, List.of(), clock, log, scoreboard, mutex, election);
+        this(nodeId, 8000 + nodeId, "localhost", List.of(), clock, log, scoreboard, mutex, election);
+    }
+
+    public static ChatHandler fromPorts(int nodeId, int port, List<Integer> peerPorts, Clock clock, MessageLog log,
+                                        Scoreboard scoreboard, MutualExclusion mutex, Election election) {
+        List<Peer> list = new ArrayList<>();
+        for (int i = 0; i < peerPorts.size(); i++) {
+            list.add(new Peer(i, "localhost", peerPorts.get(i)));
+        }
+        return new ChatHandler(nodeId, port, "localhost", list, clock, log, scoreboard, mutex, election);
     }
 
     @Override
@@ -51,7 +68,7 @@ public class ChatHandler implements HttpHandler {
 
         try {
             if ("GET".equals(method) && ("/".equals(path) || "/dashboard".equals(path))) {
-                sendHtmlResponse(exchange, 200, DashboardHtml.getHtml(nodeId, port));
+                sendHtmlResponse(exchange, 200, DashboardHtml.getHtml(nodeId, host, port));
             } else if ("POST".equals(method) && "/api/chat".equals(path)) {
                 handleChat(exchange);
             } else if ("POST".equals(method) && "/api/broadcast".equals(path)) {
@@ -111,9 +128,9 @@ public class ChatHandler implements HttpHandler {
         Message msg = new Message(nodeId, text, clock.getLamportTime(), clock.getVectorClock());
         log.add(msg);
         System.out.println("[CHAT BROADCAST] Node " + nodeId + " broadcast: \"" + text + "\" | " + clock);
-        for (int p : peerPorts) {
-            if (p == port) continue;
-            NetworkClient.postTo(p, "/api/chat", msg.toJson());
+        for (Peer p : peers) {
+            if (p.id == nodeId) continue;
+            NetworkClient.postTo(p.baseUrl, "/api/chat", msg.toJson());
         }
         sendResponse(exchange, 200, "{\"status\":\"Broadcasted\",\"message\":" + msg.toJson() + "}");
     }
@@ -165,6 +182,7 @@ public class ChatHandler implements HttpHandler {
     private String statusJson() {
         return "{"
                 + "\"node_id\":" + nodeId + ","
+                + "\"host\":\"" + Json.escape(host) + "\","
                 + "\"port\":" + port + ","
                 + "\"lamport\":" + clock.getLamportTime() + ","
                 + "\"vector\":" + Json.stringify(clock.getVectorClock()) + ","
@@ -180,7 +198,6 @@ public class ChatHandler implements HttpHandler {
     private static final int MAX_BODY_BYTES = 64 * 1024;
 
     private String readBody(HttpExchange exchange) throws IOException {
-        // Cap request body to avoid unbounded memory consumption (robust HTTP handling).
         byte[] body = exchange.getRequestBody().readNBytes(MAX_BODY_BYTES);
         return new String(body, StandardCharsets.UTF_8);
     }

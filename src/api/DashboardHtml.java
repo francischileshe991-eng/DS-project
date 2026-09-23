@@ -546,7 +546,7 @@ public final class DashboardHtml {
     <div class="status-strip">
       <div class="chip">
         <span class="chip-indicator chip-alive"></span>
-        <span>Node {{NODE_ID}} : Port {{PORT}}</span>
+        <span>Node {{NODE_ID}} : {{ENDPOINT}}</span>
       </div>
       <div id="leader-chip" class="chip chip-leader">
         <span>👑 LEADER: Node ?</span>
@@ -929,8 +929,16 @@ public final class DashboardHtml {
 """;
 
     public static String getHtml(int nodeId, int port) {
+        return getHtml(nodeId, "localhost", port);
+    }
+
+    public static String getHtml(int nodeId, String host, int port) {
+        String endpoint = (host == null || host.equals("localhost") || host.equals("127.0.0.1") || host.equals("0.0.0.0"))
+                ? "Port " + port
+                : host + ":" + port;
         return TEMPLATE
                 .replace("{{NODE_ID}}", String.valueOf(nodeId))
-                .replace("{{PORT}}", String.valueOf(port));
+                .replace("{{PORT}}", String.valueOf(port))
+                .replace("{{ENDPOINT}}", endpoint);
     }
 }

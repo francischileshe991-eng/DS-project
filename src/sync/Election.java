@@ -1,7 +1,9 @@
 package sync;
 
 import api.NetworkClient;
+import models.Peer;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -21,7 +23,7 @@ public class Election {
     private static final long ELECTION_COOLDOWN_MS = 15000;
 
     private final int nodeId;
-    private final List<Integer> peerPorts;
+    private final List<Peer> peers;
     private volatile int currentLeaderId;
     private volatile boolean isElectionInProgress = false;
     private volatile int electionAttempts = 0;
@@ -32,11 +34,11 @@ public class Election {
     private final ExecutorService execution;
     private final ScheduledExecutorService monitor;
 
-    public Election(int nodeId, List<Integer> peerPorts) {
+    public Election(int nodeId, List<Peer> peers) {
         this.nodeId = nodeId;
-        this.peerPorts = peerPorts;
+        this.peers = new ArrayList<>(peers);
         // Highest node ID is the default initial host
-        this.currentLeaderId = peerPorts.size() - 1;
+        this.currentLeaderId = peers.size() - 1;
         this.execution = Executors.newCachedThreadPool(r -> {
             Thread t = new Thread(r, "election-run-" + nodeId);
             t.setDaemon(true);
@@ -47,6 +49,14 @@ public class Election {
             t.setDaemon(true);
             return t;
         });
+    }
+
+    public static Election fromPorts(int nodeId, List<Integer> peerPorts) {
+        List<Peer> list = new ArrayList<>();
+        for (int i = 0; i < peerPorts.size(); i++) {
+            list.add(new Peer(i, "localhost", peerPorts.get(i)));
+        }
+        return new Election(nodeId, list);
     }
 
     public void setOnLeadershipWon(Runnable callback) {
@@ -75,11 +85,11 @@ public class Election {
     private void runElection() {
         int sent = 0;
         int higherPeers = 0;
-        for (int id = nodeId + 1; id < peerPorts.size(); id++) {
+        for (int id = nodeId + 1; id < peers.size(); id++) {
             higherPeers++;
-            int targetPort = peerPorts.get(id);
+            Peer target = peers.get(id);
             String payload = msg(MSG_ELECTION);
-            if (NetworkClient.postTo(targetPort, "/api/election", payload)) {
+            if (NetworkClient.postTo(target.baseUrl, "/api/election", payload)) {
                 sent++;
                 okReceived.set(true);
             }
@@ -142,8 +152,8 @@ public class Election {
         System.out.println("[ELECTION] Node " + nodeId + " received ELECTION message from Node " + senderId);
         // Reply OK to sender asynchronously so we never block incoming HTTP thread
         execution.submit(() -> {
-            if (senderId >= 0 && senderId < peerPorts.size()) {
-                NetworkClient.postTo(peerPorts.get(senderId), "/api/election", msg(MSG_OK));
+            if (senderId >= 0 && senderId < peers.size()) {
+                NetworkClient.postTo(peers.get(senderId).baseUrl, "/api/election", msg(MSG_OK));
             }
         });
 
@@ -177,12 +187,12 @@ public class Election {
 
     public void broadcastCoordinator() {
         String payload = msg(MSG_COORDINATOR);
-        for (int id = 0; id < peerPorts.size(); id++) {
+        for (int id = 0; id < peers.size(); id++) {
             if (id == nodeId) continue;
-            int port = peerPorts.get(id);
-            boolean ok = NetworkClient.postTo(port, "/api/election", payload);
-            System.out.println("[ELECTION] Node " + nodeId + " announced COORDINATOR to Node " + id
-                    + " (port " + port + ")" + (ok ? " -> ACK" : " -> UNREACHABLE"));
+            Peer target = peers.get(id);
+            boolean ok = NetworkClient.postTo(target.baseUrl, "/api/election", payload);
+            System.out.println("[ELECTION] Node " + nodeId + " announced COORDINATOR to " + target
+                    + (ok ? " -> ACK" : " -> UNREACHABLE"));
         }
     }
 
@@ -194,22 +204,22 @@ public class Election {
         if (currentLeaderId == nodeId) return;      // We are currently the leader
         if (isElectionInProgress) return;           // Already running an election
 
-        if (currentLeaderId < 0 || currentLeaderId >= peerPorts.size()) {
+        if (currentLeaderId < 0 || currentLeaderId >= peers.size()) {
             System.out.println("[HEALTH] Node " + nodeId + " detected invalid leader ID " + currentLeaderId + ". Triggering election.");
             startElection();
             return;
         }
 
-        int leaderPort = peerPorts.get(currentLeaderId);
-        if (!NetworkClient.isAlive(leaderPort)) {
+        Peer leader = peers.get(currentLeaderId);
+        if (!NetworkClient.isAlive(leader.baseUrl)) {
             System.out.println("[HEALTH] Node " + nodeId + " detected Leader Node " + currentLeaderId
-                    + " (port " + leaderPort + ") is DOWN via /api/health.");
+                    + " (" + leader.endpoint() + ") is DOWN via /api/health.");
             startElection();
         }
     }
 
     public void checkAndAssertLeadership() {
-        if (nodeId == peerPorts.size() - 1) {
+        if (nodeId == peers.size() - 1) {
             this.currentLeaderId = nodeId;
             this.isElectionInProgress = false;
             execution.submit(this::broadcastCoordinator);

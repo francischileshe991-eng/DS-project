@@ -1,6 +1,7 @@
 package sync;
 
 import api.NetworkClient;
+import models.Peer;
 import models.Scoreboard;
 import util.Json;
 
@@ -16,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 
 public class MutualExclusion {
     private final int nodeId;
-    private final List<Integer> peerPorts;
+    private final List<Peer> peers;
     private final Scoreboard scoreboard;
     private volatile boolean hasToken = false;
     private final Queue<ScoreUpdate> pendingUpdates = new LinkedList<>();
@@ -46,9 +47,9 @@ public class MutualExclusion {
         }
     }
 
-    public MutualExclusion(int nodeId, List<Integer> peerPorts, boolean startsWithToken, Scoreboard scoreboard) {
+    public MutualExclusion(int nodeId, List<Peer> peers, boolean startsWithToken, Scoreboard scoreboard) {
         this.nodeId = nodeId;
-        this.peerPorts = new ArrayList<>(peerPorts);
+        this.peers = new ArrayList<>(peers);
         this.hasToken = startsWithToken;
         this.scoreboard = scoreboard;
         this.executor = Executors.newSingleThreadExecutor(r -> {
@@ -63,8 +64,12 @@ public class MutualExclusion {
         });
     }
 
-    public MutualExclusion(int nodeId, int nextPeerPort, boolean startsWithToken, Scoreboard scoreboard) {
-        this(nodeId, List.of(nextPeerPort), startsWithToken, scoreboard);
+    public static MutualExclusion fromPorts(int nodeId, List<Integer> peerPorts, boolean startsWithToken, Scoreboard scoreboard) {
+        List<Peer> list = new ArrayList<>();
+        for (int i = 0; i < peerPorts.size(); i++) {
+            list.add(new Peer(i, "localhost", peerPorts.get(i)));
+        }
+        return new MutualExclusion(nodeId, list, startsWithToken, scoreboard);
     }
 
     public synchronized void requestCriticalSection(String player, int points) {
@@ -144,7 +149,7 @@ public class MutualExclusion {
             }
         }
 
-        int total = peerPorts.size();
+        int total = peers.size();
         if (total <= 1) {
             // Single node standalone mode
             synchronized (this) {
@@ -157,18 +162,18 @@ public class MutualExclusion {
         // Dynamically probe the next alive successor around the ring (nodeId + step) % total
         for (int step = 1; step < total; step++) {
             int targetId = (nodeId + step) % total;
-            int targetPort = peerPorts.get(targetId);
+            Peer target = peers.get(targetId);
 
-            if (NetworkClient.postTo(targetPort, "/api/token", payload)) {
+            if (NetworkClient.postTo(target.baseUrl, "/api/token", payload)) {
                 synchronized (this) {
                     lastTokenActivityMs = System.currentTimeMillis();
                 }
                 if (step > 1) {
-                    System.out.println("[TOKEN] Node " + nodeId + " bypassed offline nodes and passed token to Node "
-                            + targetId + " (port " + targetPort + ").");
+                    System.out.println("[TOKEN] Node " + nodeId + " bypassed offline nodes and passed token to "
+                            + target + ".");
                 } else {
-                    System.out.println("[TOKEN] Node " + nodeId + " passed token to Node "
-                            + targetId + " (port " + targetPort + ").");
+                    System.out.println("[TOKEN] Node " + nodeId + " passed token to "
+                            + target + ".");
                 }
                 return;
             }
@@ -215,17 +220,17 @@ public class MutualExclusion {
         boolean tokenHeldByPeer = false;
         long newestActivity = lastTokenActivityMs;
         int alivePeers = 0;
-        for (int i = 0; i < peerPorts.size(); i++) {
+        for (int i = 0; i < peers.size(); i++) {
             if (i == nodeId) continue;
-            int port = peerPorts.get(i);
-            String status = NetworkClient.getBody(port, "/api/status");
+            Peer p = peers.get(i);
+            String status = NetworkClient.getBody(p.baseUrl, "/api/status");
             if (status == null) continue;
             alivePeers++;
             try {
                 Map<String, Object> s = Json.parse(status);
                 if (Boolean.TRUE.equals(s.get("has_token"))) {
                     tokenHeldByPeer = true;
-                    System.out.println("[TOKEN HEALTH] Circulating token confirmed active at Node " + i + " (port " + port + ").");
+                    System.out.println("[TOKEN HEALTH] Circulating token confirmed active at " + p + ".");
                     break;
                 }
                 Object seen = s.get("token_seen_ms");
@@ -265,10 +270,7 @@ public class MutualExclusion {
     }
 
     private long ringGraceMs() {
-        // Max plausible rotation window: every hop pays an idle circulation delay plus network
-        // delivery, plus a scheduling-jitter margin. If the ring is alive, activity keeps this
-        // window refreshed well before it ever elapses.
-        return (long) peerPorts.size() * (IDLE_CIRCULATION_DELAY_MS + 600L) + 1500L;
+        return (long) peers.size() * (IDLE_CIRCULATION_DELAY_MS + 600L) + 1500L;
     }
 
     public int getTokenGeneration() {
