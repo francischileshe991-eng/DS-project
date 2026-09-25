@@ -73,7 +73,7 @@ Nodes elect a designated Room Host using Garcia-Molina's **Bully Election Algori
 
 | Member Name | Student ID | Assigned Component | Primary Contributions & Responsibilities |
 | :--- | :---: | :--- | :--- |
-| **Francis Chileshe** | **2022014855** | **Lead Architect / Core Engine** | System architecture, `Node.java`, server initialization, threading model. |
+| **Team Member 1 (Lead)** | — | **Lead Architect / Core Engine** | System architecture, `Node.java`, server initialization, threading model. |
 | **Team Member 2** | — | **Logical Clocks (Lamport)** | `Clock.java` Lamport clock increment & merge algorithms, local event ticking. |
 | **Team Member 3** | — | **Logical Clocks (Vector)** | Vector clock merging across $N$ nodes, causal precedence comparison utility. |
 | **Team Member 4** | — | **Message Log & Ordering** | `MessageLog.java`, deterministic $(Lamport, NodeId)$ sorting, log formatting. |

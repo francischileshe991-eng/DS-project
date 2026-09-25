@@ -1,7 +1,7 @@
 # 🌐 P2P Distributed Chat & Shared Scoreboard Observatory
 **Course**: CSC 4722 – Distributed Systems  
 **Institution**: University of Zambia (UNZA) – Department of Computer Science  
-**Lead Architect**: Francis Chileshe (Student ID: 2022014855)  
+**Project Team**: CSC 4722 Group Project  
 **Platform**: Pure Java 17+ LTS (Zero external libraries / frameworks)  
 **Test Suite Status**: `4 / 4 Scenarios Passed (100 / 100 Marks)`  
 
