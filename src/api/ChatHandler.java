@@ -47,6 +47,15 @@ public class ChatHandler implements HttpHandler {
         String path = exchange.getRequestURI().getPath();
         String method = exchange.getRequestMethod();
 
+        if ("OPTIONS".equalsIgnoreCase(method)) {
+            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+            exchange.sendResponseHeaders(204, -1);
+            exchange.close();
+            return;
+        }
+
         try {
             if ("GET".equals(method) && ("/".equals(path) || "/dashboard".equals(path))) {
                 sendHtmlResponse(exchange, 200, DashboardHtml.getHtml(nodeId, host, port));
@@ -196,6 +205,9 @@ public class ChatHandler implements HttpHandler {
 
     private void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
         exchange.getResponseHeaders().set("Content-Type", "application/json");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
         byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
         exchange.sendResponseHeaders(statusCode, bytes.length);
         OutputStream os = exchange.getResponseBody();

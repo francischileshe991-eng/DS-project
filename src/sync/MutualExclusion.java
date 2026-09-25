@@ -23,7 +23,7 @@ public class MutualExclusion {
     private final Queue<ScoreUpdate> pendingUpdates = new LinkedList<>();
     private final ExecutorService executor;
     private final ScheduledExecutorService scheduler;
-    private static final int IDLE_CIRCULATION_DELAY_MS = 350;
+    private static final int IDLE_CIRCULATION_DELAY_MS = 400;
     private static final int ISOLATED_RETRY_DELAY_MS = 1000;
     private static final int TOKEN_CHECK_INTERVAL_MS = 1000;
 
@@ -148,6 +148,7 @@ public class MutualExclusion {
     private void passToken(boolean didWork) {
         if (!hasToken) return;
         hasToken = false;
+        currentTokenHolder = -1;
         String payload = "{\"token_holder\":" + nodeId + ",\"gen\":" + tokenGeneration
                 + ",\"last_cs_node\":" + lastCsNode
                 + ",\"active_cs_node\":" + activeCsNode
@@ -185,7 +186,6 @@ public class MutualExclusion {
             if (NetworkClient.postTo(target.baseUrl, "/api/token", payload)) {
                 synchronized (this) {
                     lastTokenActivityMs = System.currentTimeMillis();
-                    currentTokenHolder = targetId;
                 }
                 if (step > 1) {
                     System.out.println("[TOKEN] Node " + nodeId + " bypassed offline nodes and passed token to "
@@ -301,8 +301,18 @@ public class MutualExclusion {
         return lastTokenActivityMs;
     }
 
-    public int getCurrentTokenHolder() {
-        return currentTokenHolder;
+    public synchronized int getCurrentTokenHolder() {
+        if (hasToken) return nodeId;
+        if (activeCsNode >= 0) return activeCsNode;
+        int total = peers.size();
+        if (total <= 1) return nodeId;
+        long elapsed = System.currentTimeMillis() - lastTokenActivityMs;
+        if (elapsed < 0) return (nodeId + 1) % total;
+        int hops = (int) (elapsed / IDLE_CIRCULATION_DELAY_MS);
+        if (hops < total) {
+            return (nodeId + 1 + hops) % total;
+        }
+        return -1;
     }
 
     public int getActiveCsNode() {

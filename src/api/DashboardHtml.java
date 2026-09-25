@@ -937,7 +937,7 @@ public final class DashboardHtml {
         const isSelf = (i === MY_NODE_ID);
         const isLeader = (i === status.leader);
         const isHolder = (status.token_holder === i);
-        const isInsideCs = (status.active_cs_node === i) || (isSelf && status.has_token && (!status.pending_cs || status.pending_cs === 0));
+        const isInsideCs = (status.active_cs_node === i);
         const isPending = (isSelf && status.pending_cs > 0);
         const isElecting = (isSelf && status.is_electing);
 
@@ -1201,7 +1201,7 @@ public final class DashboardHtml {
       return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    setInterval(pollState, 750);
+    setInterval(pollState, 350);
     pollState();
   </script>
 </body>
