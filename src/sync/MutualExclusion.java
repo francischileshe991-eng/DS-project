@@ -68,14 +68,6 @@ public class MutualExclusion {
         });
     }
 
-    public static MutualExclusion fromPorts(int nodeId, List<Integer> peerPorts, boolean startsWithToken, Scoreboard scoreboard) {
-        List<Peer> list = new ArrayList<>();
-        for (int i = 0; i < peerPorts.size(); i++) {
-            list.add(new Peer(i, "localhost", peerPorts.get(i)));
-        }
-        return new MutualExclusion(nodeId, list, startsWithToken, scoreboard);
-    }
-
     public synchronized void requestCriticalSection(String player, int points) {
         pendingUpdates.add(new ScoreUpdate(player, points));
         System.out.println("[MUTEX] Node " + nodeId + " requested CS: add " + points + " to '" + player

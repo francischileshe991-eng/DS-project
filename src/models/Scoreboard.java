@@ -21,13 +21,6 @@ public class Scoreboard {
         scores.putAll(incoming);
     }
 
-    public synchronized void merge(Map<String, Integer> incoming) {
-        if (incoming == null) return;
-        for (Map.Entry<String, Integer> e : incoming.entrySet()) {
-            scores.merge(e.getKey(), e.getValue(), Math::max);
-        }
-    }
-
     public synchronized Map<String, Integer> snapshot() {
         return new LinkedHashMap<>(scores);
     }

@@ -51,14 +51,6 @@ public class Election {
         });
     }
 
-    public static Election fromPorts(int nodeId, List<Integer> peerPorts) {
-        List<Peer> list = new ArrayList<>();
-        for (int i = 0; i < peerPorts.size(); i++) {
-            list.add(new Peer(i, "localhost", peerPorts.get(i)));
-        }
-        return new Election(nodeId, list);
-    }
-
     public void setOnLeadershipWon(Runnable callback) {
         this.onLeadershipWon = callback;
     }

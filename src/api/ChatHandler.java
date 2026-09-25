@@ -42,25 +42,6 @@ public class ChatHandler implements HttpHandler {
         this.election = election;
     }
 
-    public ChatHandler(int nodeId, int port, List<Peer> peers, Clock clock, MessageLog log,
-                       Scoreboard scoreboard, MutualExclusion mutex, Election election) {
-        this(nodeId, port, "localhost", peers, clock, log, scoreboard, mutex, election);
-    }
-
-    public ChatHandler(int nodeId, Clock clock, MessageLog log, Scoreboard scoreboard,
-                       MutualExclusion mutex, Election election) {
-        this(nodeId, 8000 + nodeId, "localhost", List.of(), clock, log, scoreboard, mutex, election);
-    }
-
-    public static ChatHandler fromPorts(int nodeId, int port, List<Integer> peerPorts, Clock clock, MessageLog log,
-                                        Scoreboard scoreboard, MutualExclusion mutex, Election election) {
-        List<Peer> list = new ArrayList<>();
-        for (int i = 0; i < peerPorts.size(); i++) {
-            list.add(new Peer(i, "localhost", peerPorts.get(i)));
-        }
-        return new ChatHandler(nodeId, port, "localhost", list, clock, log, scoreboard, mutex, election);
-    }
-
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         String path = exchange.getRequestURI().getPath();

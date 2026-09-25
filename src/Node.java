@@ -8,7 +8,6 @@ import models.Peer;
 import models.Scoreboard;
 import sync.Election;
 import sync.MutualExclusion;
-import util.Json;
 
 import java.io.BufferedReader;
 import java.io.File;
