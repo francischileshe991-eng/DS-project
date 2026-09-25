@@ -192,8 +192,23 @@ public class ChatHandler implements HttpHandler {
                 + "\"pending_cs\":" + mutex.getPendingCount() + ","
                 + "\"token_gen\":" + mutex.getTokenGeneration() + ","
                 + "\"token_seen_ms\":" + mutex.getLastTokenActivityMs() + ","
-                + "\"messages\":" + log.snapshot().size()
+                + "\"messages\":" + log.snapshot().size() + ","
+                + "\"peers\":" + peersJson()
                 + "}";
+    }
+
+    private String peersJson() {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < peers.size(); i++) {
+            if (i > 0) sb.append(",");
+            Peer p = peers.get(i);
+            sb.append("{\"id\":").append(p.id)
+              .append(",\"host\":\"").append(Json.escape(p.host))
+              .append("\",\"port\":").append(p.port)
+              .append(",\"url\":\"").append(Json.escape(p.baseUrl)).append("\"}");
+        }
+        sb.append("]");
+        return sb.toString();
     }
 
     private static final int MAX_BODY_BYTES = 64 * 1024;

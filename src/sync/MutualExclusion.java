@@ -23,7 +23,7 @@ public class MutualExclusion {
     private final Queue<ScoreUpdate> pendingUpdates = new LinkedList<>();
     private final ExecutorService executor;
     private final ScheduledExecutorService scheduler;
-    private static final int IDLE_CIRCULATION_DELAY_MS = 400;
+    private static final int IDLE_CIRCULATION_DELAY_MS = 500;
     private static final int ISOLATED_RETRY_DELAY_MS = 1000;
     private static final int TOKEN_CHECK_INTERVAL_MS = 1000;
 
