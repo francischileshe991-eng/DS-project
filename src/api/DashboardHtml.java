@@ -777,9 +777,8 @@ public final class DashboardHtml {
     let previousLeader = null;
     let lastMsgCount = 0;
     let lastScores = {};
-    let knownPeers = [];
-    let actualTokenHolder = -1;
-    let lastRenderedNodeCount = -1;
+    let lastToastMsg = '';
+    let lastToastTime = 0;
 
     function addOpsLog(msg, type = '') {
       const box = document.getElementById('ops-log');
@@ -793,6 +792,12 @@ public final class DashboardHtml {
     }
 
     function showToast(icon, msg, type = 'info') {
+      const now = Date.now();
+      if (lastToastMsg === msg && (now - lastToastTime) < 3000) {
+        return; // Suppress duplicate identical notifications within 3 seconds
+      }
+      lastToastMsg = msg;
+      lastToastTime = now;
       const container = document.getElementById('toast-container');
       if (!container) return;
       const t = document.createElement('div');
@@ -809,30 +814,6 @@ public final class DashboardHtml {
           fetch('/api/scoreboard').then(r => r.json()),
           fetch('/api/messages').then(r => r.json())
         ]);
-
-        if (resStatus.peers && resStatus.peers.length > 0) {
-          knownPeers = resStatus.peers;
-        }
-
-        // Determine actual physical token holder across cluster
-        if (resStatus.has_token) {
-          actualTokenHolder = MY_NODE_ID;
-        } else if (knownPeers.length > 0) {
-          try {
-            const checks = knownPeers
-              .filter(p => p.id !== MY_NODE_ID)
-              .map(p => fetch(p.url + '/api/status', { signal: AbortSignal.timeout(220) })
-                .then(r => r.json())
-                .catch(() => null));
-            const results = await Promise.all(checks);
-            for (const r of results) {
-              if (r && r.has_token) {
-                actualTokenHolder = r.node_id;
-                break;
-              }
-            }
-          } catch (e) {}
-        }
 
         // 1. Clocks
         document.getElementById('lamport-val').innerText = resStatus.lamport;
@@ -890,13 +871,26 @@ public final class DashboardHtml {
           }
         } else {
           csChip.className = 'chip chip-cs-status';
-          const h = (actualTokenHolder >= 0 ? actualTokenHolder : (resStatus.has_token ? MY_NODE_ID : '?'));
-          csChip.innerHTML = '<span>● CS: Idle (Token at N' + h + ')</span>';
+          csChip.innerHTML = '<span>● CS: Idle (Token Circulating)</span>';
           if (ringStatusBox) {
             ringStatusBox.className = 'ring-activity-status';
-            ringStatusBox.innerHTML = 'Token physically at <span style="color:var(--cyan); font-weight:600;">Node ' + h + '</span>. Circulating smoothly around ring.';
+            ringStatusBox.innerHTML = 'Token circulating smoothly around ring. CS available on request.';
           }
         }
+
+        // 5. Topology SVG Ring
+        renderTopologyRing(resStatus);
+
+        // 6. Scoreboard Table
+        renderScoreboard(resScores);
+
+        // 7. Chat Stream
+        renderChat(resMsgs);
+
+      } catch (err) {
+        console.error("Poll failed:", err);
+      }
+    }
 
         // 5. Topology SVG Ring
         renderTopologyRing(resStatus);
@@ -933,98 +927,91 @@ public final class DashboardHtml {
       const centerY = 110;
       const radius = 75;
 
-      let targetHolder = (status.active_cs_node !== undefined && status.active_cs_node >= 0)
-          ? status.active_cs_node
-          : (actualTokenHolder >= 0 ? actualTokenHolder : (status.has_token ? MY_NODE_ID : 0));
+      let svgContent = '';
+      // Base orbital track
+      svgContent += `<circle cx="${centerX}" cy="${centerY}" r="${radius}" class="ring-orbit" />`;
+      // Smooth motion path for traveling key token (clockwise circle)
+      svgContent += `<path id="ring-track" d="M ${centerX} ${centerY - radius} A ${radius} ${radius} 0 1 1 ${centerX - 0.01} ${centerY - radius} Z" fill="none" stroke="none" />`;
 
-      if (lastRenderedNodeCount !== totalNodes) {
-        lastRenderedNodeCount = totalNodes;
-        let svgContent = '';
-        svgContent += `<circle cx="${centerX}" cy="${centerY}" r="${radius}" class="ring-orbit" />`;
+      // Smooth traveling Token Beacon with glowing Key icon 🔑
+      svgContent += `
+      <g>
+        <circle r="13" fill="rgba(168, 85, 247, 0.4)" stroke="#c084fc" stroke-width="1.8">
+          <animate attributeName="r" values="11;15;11" dur="1s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0.9;0.5;0.9" dur="1s" repeatCount="indefinite" />
+        </circle>
+        <text font-size="13" text-anchor="middle" dominant-baseline="central">🔑</text>
+        <animateMotion dur="4s" repeatCount="indefinite">
+          <mpath href="#ring-track"/>
+        </animateMotion>
+      </g>`;
 
-        for (let i = 0; i < totalNodes; i++) {
-          const angle = (i * (2 * Math.PI / totalNodes)) - (Math.PI / 2);
-          const nx = centerX + radius * Math.cos(angle);
-          const ny = centerY + radius * Math.sin(angle);
-          svgContent += `<g id="node-group-${i}">
-            <circle id="halo-cs-${i}" cx="${nx}" cy="${ny}" r="27" fill="rgba(168, 85, 247, 0.4)" stroke="#c084fc" stroke-width="3" style="display:none;">
-              <animate attributeName="r" values="22;32;22" dur="0.9s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="1;0.4;1" dur="0.9s" repeatCount="indefinite" />
-            </circle>
-            <circle id="halo-wait-${i}" cx="${nx}" cy="${ny}" r="24" fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" stroke-dasharray="4,4" stroke-width="2" style="display:none;">
-              <animateTransform attributeName="transform" type="rotate" from="0 ${nx} ${ny}" to="360 ${nx} ${ny}" dur="3s" repeatCount="indefinite" />
-            </circle>
-            <circle id="node-circle-${i}" cx="${nx}" cy="${ny}" r="17" fill="#1e293b" stroke="rgba(255,255,255,0.2)" stroke-width="2.5" />
-            <text id="node-label-${i}" x="${nx}" y="${ny + 4}" font-family="var(--mono)" font-size="11" font-weight="700" fill="#cbd5e1" text-anchor="middle">N${i}</text>
-            <text id="node-crown-${i}" x="${nx}" y="${ny - 22}" font-size="13" text-anchor="middle" style="display:none;">👑</text>
-            <text id="node-badge-${i}" x="${nx}" y="${ny + 33}" font-family="var(--mono)" font-size="8" font-weight="700" fill="#cbd5e1" text-anchor="middle"></text>
-          </g>`;
-        }
-
-        // Persistent Token Beacon with smooth CSS transition
-        svgContent += `
-        <g id="token-beacon" style="transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1);">
-          <circle r="13" fill="rgba(168, 85, 247, 0.45)" stroke="#c084fc" stroke-width="2">
-            <animate attributeName="r" values="11;15;11" dur="1s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0.9;0.5;0.9" dur="1s" repeatCount="indefinite" />
-          </circle>
-          <text font-size="13" text-anchor="middle" dominant-baseline="central">🔑</text>
-        </g>`;
-
-        svg.innerHTML = svgContent;
-      }
-
-      // Update node states
+      // Draw connection lines and nodes
       for (let i = 0; i < totalNodes; i++) {
+        const angle = (i * (2 * Math.PI / totalNodes)) - (Math.PI / 2);
+        const nx = centerX + radius * Math.cos(angle);
+        const ny = centerY + radius * Math.sin(angle);
+
         const isSelf = (i === MY_NODE_ID);
         const isLeader = (i === status.leader);
         const isInsideCs = (status.active_cs_node === i);
         const isPending = (isSelf && status.pending_cs > 0);
+        const isElecting = (isSelf && status.is_electing);
 
-        const circle = document.getElementById(`node-circle-${i}`);
-        const label = document.getElementById(`node-label-${i}`);
-        const crown = document.getElementById(`node-crown-${i}`);
-        const badge = document.getElementById(`node-badge-${i}`);
-        const haloCs = document.getElementById(`halo-cs-${i}`);
-        const haloWait = document.getElementById(`halo-wait-${i}`);
+        let nodeColor = '#1e293b';
+        let strokeColor = 'rgba(255,255,255,0.2)';
+        let textColor = '#cbd5e1';
 
-        if (circle) {
-          circle.setAttribute('fill', isSelf ? '#0369a1' : '#1e293b');
-          circle.setAttribute('stroke', isLeader ? '#f59e0b' : (isSelf ? '#38bdf8' : 'rgba(255,255,255,0.2)'));
+        if (isSelf) {
+          nodeColor = '#0369a1';
+          strokeColor = '#38bdf8';
+          textColor = '#ffffff';
         }
-        if (label) {
-          label.setAttribute('fill', isSelf ? '#ffffff' : '#cbd5e1');
+        if (isLeader) {
+          strokeColor = '#f59e0b';
         }
-        if (crown) {
-          crown.style.display = isLeader ? 'block' : 'none';
+
+        // 1. Halo for Critical Section (Glowing purple)
+        if (isInsideCs) {
+          svgContent += `<circle cx="${nx}" cy="${ny}" r="27" fill="rgba(168, 85, 247, 0.4)" stroke="#c084fc" stroke-width="3">
+            <animate attributeName="r" values="22;32;22" dur="0.9s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="1;0.4;1" dur="0.9s" repeatCount="indefinite" />
+          </circle>`;
         }
-        if (haloCs) {
-          haloCs.style.display = isInsideCs ? 'block' : 'none';
+        // 2. Halo for Awaiting Token (Dashed rotating amber)
+        else if (isPending) {
+          svgContent += `<circle cx="${nx}" cy="${ny}" r="24" fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" stroke-dasharray="4,4" stroke-width="2">
+            <animateTransform attributeName="transform" type="rotate" from="0 ${nx} ${ny}" to="360 ${nx} ${ny}" dur="3s" repeatCount="indefinite" />
+          </circle>`;
         }
-        if (haloWait) {
-          haloWait.style.display = isPending ? 'block' : 'none';
+        // 3. Halo for Electing (Electric cyan)
+        else if (isElecting) {
+          svgContent += `<circle cx="${nx}" cy="${ny}" r="25" fill="rgba(56, 189, 248, 0.25)" stroke="#38bdf8" stroke-width="2">
+            <animate attributeName="r" values="18;26;18" dur="0.8s" repeatCount="indefinite" />
+          </circle>`;
         }
-        if (badge) {
-          if (isInsideCs) {
-            badge.textContent = '🔑 IN CS';
-            badge.setAttribute('fill', '#e9d5ff');
-          } else if (isPending) {
-            badge.textContent = '⏳ WAITING';
-            badge.setAttribute('fill', '#fcd34d');
-          } else {
-            badge.textContent = '';
-          }
+
+        // Main node bubble
+        svgContent += `<circle cx="${nx}" cy="${ny}" r="17" fill="${nodeColor}" stroke="${strokeColor}" stroke-width="2.5" />`;
+        svgContent += `<text x="${nx}" y="${ny + 4}" font-family="var(--mono)" font-size="11" font-weight="700" fill="${textColor}" text-anchor="middle">N${i}</text>`;
+
+        // Crown and title on leader
+        if (isLeader) {
+          svgContent += `<text x="${nx}" y="${ny - 22}" font-size="13" text-anchor="middle">👑</text>`;
+          svgContent += `<text x="${nx}" y="${ny - 33}" font-family="var(--mono)" font-size="8" font-weight="700" fill="#f59e0b" text-anchor="middle">LEADER</text>`;
+        }
+
+        // Dynamic status badges below node
+        if (isInsideCs) {
+          svgContent += `<text x="${nx}" y="${ny + 33}" font-family="var(--mono)" font-size="9" font-weight="700" fill="#e9d5ff" text-anchor="middle">🔑 IN CS</text>`;
+        } else if (isPending) {
+          svgContent += `<text x="${nx}" y="${ny + 33}" font-family="var(--mono)" font-size="8" font-weight="700" fill="#fcd34d" text-anchor="middle">⏳ WAITING</text>`;
+        } else if (isElecting) {
+          svgContent += `<text x="${nx}" y="${ny + 33}" font-family="var(--mono)" font-size="8" font-weight="700" fill="#38bdf8" text-anchor="middle">⚡ ELECTING</text>`;
         }
       }
 
-      // Glide the actual token beacon to the current holder node
-      const beacon = document.getElementById('token-beacon');
-      if (beacon && targetHolder >= 0 && targetHolder < totalNodes) {
-        const hAngle = (targetHolder * (2 * Math.PI / totalNodes)) - (Math.PI / 2);
-        const kx = centerX + (radius - 23) * Math.cos(hAngle);
-        const ky = centerY + (radius - 23) * Math.sin(hAngle);
-        beacon.setAttribute('transform', `translate(${kx}, ${ky})`);
-      }
+      svg.innerHTML = svgContent;
     }
 
     function renderScoreboard(scores) {
@@ -1109,12 +1096,15 @@ public final class DashboardHtml {
       pIn.value = '';
 
       let tries = 0;
+      let resolved = false;
       const initialPts = lastScores[player] || 0;
       const timer = setInterval(async () => {
+        if (resolved) return;
         tries++;
         await pollState();
         const currentPts = lastScores[player] || 0;
         if (currentPts > initialPts || tries >= 15) {
+          resolved = true;
           clearInterval(timer);
           if (currentPts > initialPts) {
             addOpsLog(`Scoreboard updated: '${player}' is now ${currentPts} pts in CS.`, 'success');
@@ -1142,12 +1132,15 @@ public final class DashboardHtml {
         });
 
         let tries = 0;
+        let resolved = false;
         const initialPts = lastScores[myPlayer] || 0;
         const timer = setInterval(async () => {
+          if (resolved) return;
           tries++;
           await pollState();
           const currentPts = lastScores[myPlayer] || 0;
           if (currentPts > initialPts || tries >= 16) {
+            resolved = true;
             clearInterval(timer);
             if (btn) {
               btn.disabled = false;
@@ -1158,7 +1151,7 @@ public final class DashboardHtml {
               showToast('✅', `Token acquired! Critical Section executed: ${myPlayer} now has ${currentPts} pts.`, 'success');
             }
           }
-        }, 250);
+        }, 300);
       } catch (err) {
         showToast('⚠️', 'Score request failed: ' + err.message, 'cs');
         if (btn) {
@@ -1207,7 +1200,7 @@ public final class DashboardHtml {
       return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    setInterval(pollState, 250);
+    setInterval(pollState, 750);
     pollState();
   </script>
 </body>
