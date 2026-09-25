@@ -2,7 +2,7 @@
 # Starts N distributed nodes on ports basePort .. basePort + N - 1
 
 param(
-    [int]$Nodes = 3,
+    [int]$Nodes = 5,
     [int]$BasePort = 8000,
     [switch]$OpenWindows
 )
@@ -18,8 +18,13 @@ if (!(Test-Path "logs")) {
     New-Item -ItemType Directory -Path "logs" | Out-Null
 }
 
+$lanIp = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notmatch 'Loopback' -and $_.IPAddress -notlike '169.254*' -and $_.IPAddress -notlike '192.168.56*' } | Select-Object -First 1).IPAddress
+
 Write-Host "======================================================" -ForegroundColor Cyan
 Write-Host " Starting Distributed Cluster: $Nodes Nodes (Ports $BasePort-$($BasePort + $Nodes - 1))" -ForegroundColor Cyan
+if ($lanIp) {
+    Write-Host " Host Network IP: $lanIp" -ForegroundColor Cyan
+}
 Write-Host "======================================================" -ForegroundColor Cyan
 
 $pids = @()
@@ -76,6 +81,8 @@ for ($id = 0; $id -lt $Nodes; $id++) {
 Write-Host "`nAccess Web Dashboards in your browser:" -ForegroundColor Cyan
 for ($id = 0; $id -lt $Nodes; $id++) {
     $port = $BasePort + $id
-    Write-Host "  Node $id Dashboard: http://localhost:$port/" -ForegroundColor Green
+    $netUrl = if ($lanIp) { " | Network: http://$lanIp`:$port/" } else { "" }
+    Write-Host "  Node $id Dashboard: http://localhost:$port/$netUrl" -ForegroundColor Green
 }
 Write-Host "`nTo stop the cluster, run: .\scripts\stop-cluster.ps1`n" -ForegroundColor Gray
+

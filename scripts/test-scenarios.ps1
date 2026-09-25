@@ -47,7 +47,8 @@ if ($Remote -or ($ConfigFile -and (Test-Path $ConfigFile))) {
             Write-Host "  Target Node 0: $url0" -ForegroundColor Gray
             Write-Host "  Target Node 1: $url1" -ForegroundColor Gray
             Write-Host "  Target Node 2: $url2" -ForegroundColor Gray
-        } else {
+        }
+        else {
             Write-Host "Warning: $cfgPath contained fewer than 3 endpoints. Falling back to localhost." -ForegroundColor Yellow
         }
     }
@@ -58,7 +59,8 @@ if (!$isRemote) {
     & "$PSScriptRoot\stop-cluster.ps1"
     Start-Sleep -Seconds 1
     & "$PSScriptRoot\start-cluster.ps1" -Nodes 3 -BasePort 8000
-} else {
+}
+else {
     Write-Host "Running in REMOTE / MULTI-PC mode (targeting running nodes).`n" -ForegroundColor Green
 }
 
@@ -69,7 +71,8 @@ function Assert-Condition($condition, $message) {
     if ($condition) {
         Write-Host "  [PASS] $message" -ForegroundColor Green
         return $true
-    } else {
+    }
+    else {
         Write-Host "  [FAIL] $message" -ForegroundColor Red
         return $false
     }
@@ -181,7 +184,8 @@ if (!$isRemote) {
     $t3_ok = (Assert-Condition ($stat1.is_leader -eq $true) "Node 1 successfully declared itself new LEADER") -and $t3_ok
     $t3_ok = (Assert-Condition ($stat0.leader -eq 1) "Node 0 recognized Node 1 as the new COORDINATOR") -and $t3_ok
     $t3_ok = (Assert-Condition ($stat1.leader -eq 1) "Node 1 is recognized as leader cluster-wide") -and $t3_ok
-} else {
+}
+else {
     Write-Host "  Remote Mode: Triggering Bully Election wave from Node 0..." -ForegroundColor Cyan
     Invoke-RestMethod -Uri "$url0/api/trigger-election" -Method Post | Out-Null
     Start-Sleep -Seconds 3
@@ -223,6 +227,7 @@ Write-Host "====================================================================
 # Cleanup
 if (!$isRemote) {
     & "$PSScriptRoot\stop-cluster.ps1"
-} else {
+}
+else {
     Write-Host "Remote test complete. Nodes remain active on their respective machines.`n" -ForegroundColor Green
 }
