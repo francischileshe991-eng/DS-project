@@ -139,12 +139,15 @@ public class Node {
         try (InputStream in = new FileInputStream(file)) {
             props.load(in);
         }
-        Map<Integer, String> map = new TreeMap<>();
+        TreeMap<Integer, String> map = new TreeMap<>();
         for (String key : props.stringPropertyNames()) {
             String val = props.getProperty(key).trim();
+            if (val.isBlank()) continue;
             int id = -1;
             if (key.startsWith("node.")) {
-                id = Integer.parseInt(key.substring(5).trim());
+                try {
+                    id = Integer.parseInt(key.substring(5).trim());
+                } catch (NumberFormatException ignore) {}
             } else {
                 try {
                     id = Integer.parseInt(key.trim());
@@ -157,9 +160,15 @@ public class Node {
         if (map.isEmpty()) {
             throw new IllegalArgumentException("No valid node configurations found in " + file.getName());
         }
+        int maxId = map.lastKey();
         List<Peer> list = new ArrayList<>();
-        for (Map.Entry<Integer, String> e : map.entrySet()) {
-            list.add(Peer.parse(e.getKey(), e.getValue()));
+        for (int i = 0; i <= maxId; i++) {
+            String addr = map.get(i);
+            if (addr == null || addr.isBlank()) {
+                throw new IllegalArgumentException("Missing configuration for 'node." + i + "' in " + file.getName() + 
+                        ". Expected contiguous nodes 0 to " + maxId + ". Please add: node." + i + "=<host>:<port>");
+            }
+            list.add(Peer.parse(i, addr));
         }
         return list;
     }
