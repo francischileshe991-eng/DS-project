@@ -892,20 +892,6 @@ public final class DashboardHtml {
       }
     }
 
-        // 5. Topology SVG Ring
-        renderTopologyRing(resStatus);
-
-        // 6. Scoreboard Table
-        renderScoreboard(resScores);
-
-        // 7. Chat Stream
-        renderChat(resMsgs);
-
-      } catch (err) {
-        console.error("Poll failed:", err);
-      }
-    }
-
     function renderVectorPills(vector) {
       const container = document.getElementById('vector-cells');
       if (!vector) return;
@@ -922,7 +908,8 @@ public final class DashboardHtml {
 
     function renderTopologyRing(status) {
       const svg = document.getElementById('topology-svg');
-      const totalNodes = (status.vector && status.vector.length) ? status.vector.length : 3;
+      if (!svg) return;
+      const totalNodes = (status && status.vector && status.vector.length) ? status.vector.length : 3;
       const centerX = 140;
       const centerY = 110;
       const radius = 75;
@@ -953,10 +940,10 @@ public final class DashboardHtml {
         const ny = centerY + radius * Math.sin(angle);
 
         const isSelf = (i === MY_NODE_ID);
-        const isLeader = (i === status.leader);
-        const isInsideCs = (status.active_cs_node === i);
-        const isPending = (isSelf && status.pending_cs > 0);
-        const isElecting = (isSelf && status.is_electing);
+        const isLeader = Boolean(status && i === status.leader);
+        const isInsideCs = Boolean(status && status.active_cs_node === i);
+        const isPending = Boolean(status && isSelf && status.pending_cs > 0);
+        const isElecting = Boolean(status && isSelf && status.is_electing);
 
         let nodeColor = '#1e293b';
         let strokeColor = 'rgba(255,255,255,0.2)';
@@ -1200,6 +1187,7 @@ public final class DashboardHtml {
       return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    renderTopologyRing({ vector: [0, 0, 0], leader: -1, active_cs_node: -1, is_electing: false });
     setInterval(pollState, 750);
     pollState();
   </script>
