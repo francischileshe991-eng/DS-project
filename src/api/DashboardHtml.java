@@ -530,6 +530,99 @@ public final class DashboardHtml {
       gap: 8px;
     }
     .callout-icon { color: var(--purple); font-size: 14px; }
+
+    /* Operational Live Log */
+    .ops-log {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      font-family: var(--mono);
+      font-size: 0.71rem;
+      color: var(--text-muted);
+      height: 72px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .ops-log-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      line-height: 1.35;
+    }
+    .ops-log-item.highlight { color: var(--cyan); font-weight: 600; }
+    .ops-log-item.success { color: var(--emerald); font-weight: 600; }
+    .ops-log-item.bully { color: var(--amber); font-weight: 600; }
+
+    /* Toast Notification System */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .toast {
+      pointer-events: auto;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius);
+      padding: 12px 18px;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--text-main);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(56, 189, 248, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      backdrop-filter: blur(8px);
+      animation: slideInToast 0.3s cubic-bezier(0.16, 1, 0.3, 1), fadeOutToast 0.4s ease 3.6s forwards;
+      max-width: 380px;
+    }
+    .toast.toast-bully { border-color: var(--amber); box-shadow: 0 0 15px rgba(245, 158, 11, 0.25); }
+    .toast.toast-cs { border-color: var(--purple); box-shadow: 0 0 15px rgba(168, 85, 247, 0.25); }
+    .toast.toast-success { border-color: var(--emerald); box-shadow: 0 0 15px rgba(16, 185, 129, 0.25); }
+    @keyframes slideInToast { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes fadeOutToast { to { opacity: 0; transform: translateY(-10px); } }
+
+    .chip-cs-status {
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-family: var(--mono);
+      font-size: 0.73rem;
+      transition: all 0.3s ease;
+    }
+    .chip-cs-status.active {
+      background: rgba(168, 85, 247, 0.25);
+      border-color: #c084fc;
+      color: #e9d5ff;
+      font-weight: 700;
+      box-shadow: 0 0 12px rgba(168, 85, 247, 0.4);
+    }
+    .ring-activity-status {
+      font-size: 0.72rem;
+      font-family: var(--mono);
+      text-align: center;
+      padding: 6px 10px;
+      border-radius: var(--radius);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-top: 6px;
+    }
+    .ring-activity-status.active {
+      background: rgba(168, 85, 247, 0.15);
+      border-color: rgba(168, 85, 247, 0.4);
+      color: #e9d5ff;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -554,6 +647,9 @@ public final class DashboardHtml {
       <div id="token-chip" class="chip chip-token" style="display:none;">
         <span>🔑 TOKEN HELD</span>
       </div>
+      <div id="cs-monitor-chip" class="chip chip-cs-status">
+        <span>● CS: Idle (Relaying)</span>
+      </div>
     </div>
   </header>
 
@@ -572,7 +668,10 @@ public final class DashboardHtml {
             <!-- Dynamic SVG nodes and token orbit rendered via JS -->
           </svg>
         </div>
-        <div style="font-size:0.7rem; font-family:var(--mono); color:var(--text-dim); text-align:center;">
+        <div id="ring-activity-status" class="ring-activity-status">
+          Token circulating passively around ring.
+        </div>
+        <div style="font-size:0.68rem; font-family:var(--mono); color:var(--text-dim); text-align:center; margin-top:4px;">
           Dynamic Peer Skipping: Ring automatically bypasses crashed nodes
         </div>
       </div>
@@ -613,18 +712,21 @@ public final class DashboardHtml {
           <span class="panel-badge">Garcia-Molina Bully</span>
         </div>
         <div class="action-group">
-          <button class="btn btn-bully" onclick="triggerElection()">
+          <button id="btn-bully-trigger" class="btn btn-bully" onclick="triggerElection()">
             <span>⚡ Trigger Bully Election</span>
             <span style="font-size:0.7rem; opacity:0.8;">Run Wave →</span>
           </button>
-          <button class="btn btn-cs" onclick="quickIncrement()">
+          <button id="btn-cs-trigger" class="btn btn-cs" onclick="quickIncrement()">
             <span>🔑 Request Critical Section</span>
             <span style="font-size:0.7rem; opacity:0.8;">+1 Pts →</span>
           </button>
         </div>
+        <div id="ops-log" class="ops-log">
+          <div class="ops-log-item"><span style="color:var(--emerald);">●</span> Cluster online. Token circulating around ring.</div>
+        </div>
         <div class="callout-box">
           <span class="callout-icon">ℹ</span>
-          <span>Bully algorithm dynamically challenges higher node IDs. Shared scoreboard is mutated strictly while holding the token.</span>
+          <span><strong>Token Passing ≠ In Critical Section:</strong> Ring token circulates continuously to give access permission. Nodes only enter Critical Section when executing pending scoreboard mutations.</span>
         </div>
       </div>
 
@@ -684,12 +786,36 @@ public final class DashboardHtml {
     </div>
   </div>
 
+  <div id="toast-container" class="toast-container"></div>
+
   <script>
     const MY_NODE_ID = {{NODE_ID}};
     const MY_PORT = {{PORT}};
 
     let previousLeader = null;
     let lastMsgCount = 0;
+    let lastScores = {};
+
+    function addOpsLog(msg, type = '') {
+      const box = document.getElementById('ops-log');
+      if (!box) return;
+      const time = new Date().toLocaleTimeString();
+      const div = document.createElement('div');
+      div.className = 'ops-log-item' + (type ? ' ' + type : '');
+      div.innerHTML = `<span style="opacity:0.6;">[${time}]</span> ${msg}`;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function showToast(icon, msg, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const t = document.createElement('div');
+      t.className = `toast toast-${type}`;
+      t.innerHTML = `<span style="font-size:1.15rem;">${icon}</span> <span>${escapeHtml(msg)}</span>`;
+      container.appendChild(t);
+      setTimeout(() => { if (t.parentNode) t.parentNode.removeChild(t); }, 4000);
+    }
 
     async function pollState() {
       try {
@@ -707,7 +833,7 @@ public final class DashboardHtml {
         // Vector pills
         renderVectorPills(resStatus.vector);
 
-        // 2. Leader & Token Badges
+        // 2. Leader Badge
         const leaderChip = document.getElementById('leader-chip');
         if (resStatus.is_leader) {
           leaderChip.innerHTML = '<span>👑 YOU ARE LEADER (Node ' + MY_NODE_ID + ')</span>';
@@ -717,16 +843,59 @@ public final class DashboardHtml {
           leaderChip.style.background = 'var(--surface-elevated)';
         }
 
-        const tokenChip = document.getElementById('token-chip');
-        tokenChip.style.display = resStatus.has_token ? 'flex' : 'none';
+        if (previousLeader !== null && resStatus.leader !== previousLeader) {
+          addOpsLog(`Leadership changed: Node ${resStatus.leader} is new Coordinator!`, 'bully');
+          showToast('👑', `Leadership changed! New Coordinator is Node ${resStatus.leader}`, 'bully');
+        }
+        previousLeader = resStatus.leader;
 
-        // 3. Topology SVG Ring
+        // 3. Token & CS Badges in Header
+        const tokenChip = document.getElementById('token-chip');
+        if (resStatus.has_token) {
+          tokenChip.style.display = 'flex';
+          tokenChip.innerHTML = '<span>🔑 TOKEN HELD</span>';
+          tokenChip.style.background = 'rgba(168, 85, 247, 0.25)';
+          tokenChip.style.borderColor = 'rgba(168, 85, 247, 0.5)';
+          tokenChip.style.color = 'var(--purple)';
+        } else if (resStatus.pending_cs > 0) {
+          tokenChip.style.display = 'flex';
+          tokenChip.innerHTML = '<span>⏳ AWAITING TOKEN (' + resStatus.pending_cs + ')</span>';
+          tokenChip.style.background = 'rgba(245, 158, 11, 0.2)';
+          tokenChip.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+          tokenChip.style.color = 'var(--amber)';
+        } else {
+          tokenChip.style.display = 'none';
+        }
+
+        // 4. CS Monitor Telemetry Chip & Ring Status
+        const csChip = document.getElementById('cs-monitor-chip');
+        const ringStatusBox = document.getElementById('ring-activity-status');
+        const isCsActive = (resStatus.active_cs_node !== undefined && resStatus.active_cs_node >= 0);
+
+        if (isCsActive) {
+          csChip.className = 'chip chip-cs-status active';
+          csChip.innerHTML = '<span>🔑 Node ' + resStatus.active_cs_node + ' IN CS</span>';
+          if (ringStatusBox) {
+            ringStatusBox.className = 'ring-activity-status active';
+            ringStatusBox.innerHTML = '🔑 <span style="font-weight:700;">Node ' + resStatus.active_cs_node + '</span> is in Critical Section (Mutating Scoreboard)';
+          }
+        } else {
+          csChip.className = 'chip chip-cs-status';
+          const holder = (resStatus.token_holder !== undefined && resStatus.token_holder >= 0) ? resStatus.token_holder : '?';
+          csChip.innerHTML = '<span>● CS: Idle (Token at N' + holder + ')</span>';
+          if (ringStatusBox) {
+            ringStatusBox.className = 'ring-activity-status';
+            ringStatusBox.innerHTML = 'Token at <span style="color:var(--cyan); font-weight:600;">Node ' + holder + '</span>. Circulating passively (Idle Relay — No CS).';
+          }
+        }
+
+        // 5. Topology SVG Ring
         renderTopologyRing(resStatus);
 
-        // 4. Scoreboard Table
+        // 6. Scoreboard Table
         renderScoreboard(resScores);
 
-        // 5. Chat Stream
+        // 7. Chat Stream
         renderChat(resMsgs);
 
       } catch (err) {
@@ -758,21 +927,6 @@ public final class DashboardHtml {
       let svgContent = '';
       // Base orbital track
       svgContent += `<circle cx="${centerX}" cy="${centerY}" r="${radius}" class="ring-orbit" />`;
-      // Invisible motion path for traveling key token (clockwise circle starting at top)
-      svgContent += `<path id="ring-track" d="M ${centerX} ${centerY - radius} A ${radius} ${radius} 0 1 1 ${centerX - 0.01} ${centerY - radius} Z" fill="none" stroke="none" />`;
-
-      // Physically traveling Token Beacon with glowing Key icon 🔑
-      svgContent += `
-      <g>
-        <circle r="14" fill="rgba(168, 85, 247, 0.35)" stroke="#c084fc" stroke-width="2">
-          <animate attributeName="r" values="12;16;12" dur="1s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="0.8;0.4;0.8" dur="1s" repeatCount="indefinite" />
-        </circle>
-        <text font-size="14" text-anchor="middle" dominant-baseline="central">🔑</text>
-        <animateMotion dur="5s" repeatCount="indefinite">
-          <mpath href="#ring-track"/>
-        </animateMotion>
-      </g>`;
 
       // Draw connection lines and nodes
       for (let i = 0; i < totalNodes; i++) {
@@ -782,7 +936,10 @@ public final class DashboardHtml {
 
         const isSelf = (i === MY_NODE_ID);
         const isLeader = (i === status.leader);
-        const hasToken = (isSelf && status.has_token);
+        const isHolder = (status.token_holder === i);
+        const isInsideCs = (status.active_cs_node === i) || (isSelf && status.has_token && (!status.pending_cs || status.pending_cs === 0));
+        const isPending = (isSelf && status.pending_cs > 0);
+        const isElecting = (isSelf && status.is_electing);
 
         let nodeColor = '#1e293b';
         let strokeColor = 'rgba(255,255,255,0.2)';
@@ -797,12 +954,28 @@ public final class DashboardHtml {
           strokeColor = '#f59e0b';
         }
 
-        // Outer pulse ring if token is currently held in CS by this node
-        if (hasToken) {
-          svgContent += `<circle cx="${nx}" cy="${ny}" r="24" fill="rgba(168, 85, 247, 0.25)" stroke="#a855f7" stroke-width="2.5">
-            <animate attributeName="r" values="20;28;20" dur="1.4s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="1;0.4;1" dur="1.4s" repeatCount="indefinite" />
+        // 1. Halo for Critical Section (Highest priority: glowing purple)
+        if (isInsideCs) {
+          svgContent += `<circle cx="${nx}" cy="${ny}" r="27" fill="rgba(168, 85, 247, 0.4)" stroke="#c084fc" stroke-width="3">
+            <animate attributeName="r" values="22;32;22" dur="0.9s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="1;0.4;1" dur="0.9s" repeatCount="indefinite" />
           </circle>`;
+        }
+        // 2. Halo for Awaiting Token (Dashed rotating amber)
+        else if (isPending) {
+          svgContent += `<circle cx="${nx}" cy="${ny}" r="24" fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" stroke-dasharray="4,4" stroke-width="2">
+            <animateTransform attributeName="transform" type="rotate" from="0 ${nx} ${ny}" to="360 ${nx} ${ny}" dur="3s" repeatCount="indefinite" />
+          </circle>`;
+        }
+        // 3. Halo for Electing (Electric cyan)
+        else if (isElecting) {
+          svgContent += `<circle cx="${nx}" cy="${ny}" r="25" fill="rgba(56, 189, 248, 0.25)" stroke="#38bdf8" stroke-width="2">
+            <animate attributeName="r" values="18;26;18" dur="0.8s" repeatCount="indefinite" />
+          </circle>`;
+        }
+        // 4. Subtle beacon for Token Holder when idle
+        else if (isHolder) {
+          svgContent += `<circle cx="${nx}" cy="${ny}" r="22" fill="rgba(168, 85, 247, 0.2)" stroke="#a855f7" stroke-width="1.8" stroke-dasharray="2,2" />`;
         }
 
         // Main node bubble
@@ -815,18 +988,43 @@ public final class DashboardHtml {
           svgContent += `<text x="${nx}" y="${ny - 33}" font-family="var(--mono)" font-size="8" font-weight="700" fill="#f59e0b" text-anchor="middle">LEADER</text>`;
         }
 
-        // Token badge
-        if (hasToken) {
-          svgContent += `<text x="${nx}" y="${ny + 30}" font-family="var(--mono)" font-size="9" font-weight="700" fill="#d8b4fe" text-anchor="middle">🔑 IN CS</text>`;
+        // Dynamic status badges below node
+        if (isInsideCs) {
+          svgContent += `<text x="${nx}" y="${ny + 33}" font-family="var(--mono)" font-size="9" font-weight="700" fill="#e9d5ff" text-anchor="middle">🔑 IN CS</text>`;
+        } else if (isPending) {
+          svgContent += `<text x="${nx}" y="${ny + 33}" font-family="var(--mono)" font-size="8" font-weight="700" fill="#fcd34d" text-anchor="middle">⏳ WAITING</text>`;
+        } else if (isHolder) {
+          svgContent += `<text x="${nx}" y="${ny + 33}" font-family="var(--mono)" font-size="8" font-weight="700" fill="#c084fc" text-anchor="middle">🔑 TOKEN</text>`;
+        } else if (isElecting) {
+          svgContent += `<text x="${nx}" y="${ny + 33}" font-family="var(--mono)" font-size="8" font-weight="700" fill="#38bdf8" text-anchor="middle">⚡ ELECTING</text>`;
         }
+      }
+
+      // Traveling Key Beacon positioned at current Token Holder:
+      const activeHolder = (status.active_cs_node !== undefined && status.active_cs_node >= 0)
+          ? status.active_cs_node
+          : (status.token_holder !== undefined && status.token_holder >= 0 ? status.token_holder : -1);
+
+      if (activeHolder >= 0 && activeHolder < totalNodes) {
+        const hAngle = (activeHolder * (2 * Math.PI / totalNodes)) - (Math.PI / 2);
+        const kx = centerX + (radius - 23) * Math.cos(hAngle);
+        const ky = centerY + (radius - 23) * Math.sin(hAngle);
+        svgContent += `
+        <g transform="translate(${kx}, ${ky})">
+          <circle r="12" fill="rgba(168, 85, 247, 0.45)" stroke="#c084fc" stroke-width="1.5">
+            <animate attributeName="r" values="10;14;10" dur="1.2s" repeatCount="indefinite" />
+          </circle>
+          <text font-size="12" text-anchor="middle" dominant-baseline="central">🔑</text>
+        </g>`;
       }
 
       svg.innerHTML = svgContent;
     }
 
     function renderScoreboard(scores) {
+      lastScores = scores || {};
       const tbody = document.getElementById('scores-body');
-      const entries = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+      const entries = Object.entries(lastScores).sort((a, b) => b[1] - a[1]);
       if (entries.length === 0) {
         tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-dim); padding:20px; font-family:var(--mono);">No scores entered yet. Acquire token to update!</td></tr>';
         return;
@@ -893,27 +1091,109 @@ public final class DashboardHtml {
       const player = pIn.value.trim();
       const points = parseInt(ptsIn.value);
       if (!player || isNaN(points)) return;
+
+      addOpsLog(`Enqueued CS request: '${player}' (+${points} pts). Awaiting token...`, 'highlight');
+      showToast('🔑', `CS Request enqueued for '${player}' (+${points} pts). Waiting for token...`, 'cs');
+
       await fetch('/api/score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ player: player, points: points })
       });
       pIn.value = '';
-      pollState();
+
+      let tries = 0;
+      const initialPts = lastScores[player] || 0;
+      const timer = setInterval(async () => {
+        tries++;
+        await pollState();
+        const currentPts = lastScores[player] || 0;
+        if (currentPts > initialPts || tries >= 15) {
+          clearInterval(timer);
+          if (currentPts > initialPts) {
+            addOpsLog(`Scoreboard updated: '${player}' is now ${currentPts} pts in CS.`, 'success');
+            showToast('✅', `Token acquired! '${player}' updated to ${currentPts} pts in CS.`, 'success');
+          }
+        }
+      }, 300);
     }
 
     async function quickIncrement() {
-      await fetch('/api/score', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ player: 'Node' + MY_NODE_ID, points: 1 })
-      });
-      pollState();
+      const btn = document.getElementById('btn-cs-trigger');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳ Waiting for Token...</span>';
+      }
+      const myPlayer = 'Node' + MY_NODE_ID;
+      addOpsLog(`Node ${MY_NODE_ID} requested Critical Section (+1 pt). Waiting for ring token...`, 'highlight');
+      showToast('🔑', `Critical Section requested (+1 pt). Waiting for circulating ring token...`, 'cs');
+
+      try {
+        await fetch('/api/score', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ player: myPlayer, points: 1 })
+        });
+
+        let tries = 0;
+        const initialPts = lastScores[myPlayer] || 0;
+        const timer = setInterval(async () => {
+          tries++;
+          await pollState();
+          const currentPts = lastScores[myPlayer] || 0;
+          if (currentPts > initialPts || tries >= 16) {
+            clearInterval(timer);
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = '<span>🔑 Request Critical Section</span><span style="font-size:0.7rem; opacity:0.8;">+1 Pts →</span>';
+            }
+            if (currentPts > initialPts) {
+              addOpsLog(`Token held by Node ${MY_NODE_ID}! Critical Section executed (+1 pt -> ${currentPts} pts).`, 'success');
+              showToast('✅', `Token acquired! Critical Section executed: ${myPlayer} now has ${currentPts} pts.`, 'success');
+            }
+          }
+        }, 250);
+      } catch (err) {
+        showToast('⚠️', 'Score request failed: ' + err.message, 'cs');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>🔑 Request Critical Section</span><span style="font-size:0.7rem; opacity:0.8;">+1 Pts →</span>';
+        }
+      }
     }
 
     async function triggerElection() {
-      await fetch('/api/trigger-election', { method: 'POST' });
-      pollState();
+      const btn = document.getElementById('btn-bully-trigger');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>⚡ Challenging Peers...</span>';
+      }
+      addOpsLog(`Node ${MY_NODE_ID} launched Bully election wave. Challenging higher node IDs...`, 'bully');
+      showToast('⚡', `Bully Election initiated from Node ${MY_NODE_ID}! Challenging higher nodes...`, 'bully');
+
+      try {
+        await fetch('/api/trigger-election', { method: 'POST' });
+        let count = 0;
+        const pollElection = setInterval(async () => {
+          count++;
+          await pollState();
+          if (count >= 6) {
+            clearInterval(pollElection);
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = '<span>⚡ Trigger Bully Election</span><span style="font-size:0.7rem; opacity:0.8;">Run Wave →</span>';
+            }
+            addOpsLog(`Bully election wave finished. Coordinator is Node ${previousLeader}.`, 'bully');
+            showToast('👑', `Bully Election complete: Node ${previousLeader} is Coordinator!`, 'bully');
+          }
+        }, 500);
+      } catch (err) {
+        showToast('⚠️', 'Election trigger error: ' + err.message, 'bully');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>⚡ Trigger Bully Election</span><span style="font-size:0.7rem; opacity:0.8;">Run Wave →</span>';
+        }
+      }
     }
 
     function escapeHtml(str) {
@@ -921,7 +1201,7 @@ public final class DashboardHtml {
       return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    setInterval(pollState, 1000);
+    setInterval(pollState, 750);
     pollState();
   </script>
 </body>

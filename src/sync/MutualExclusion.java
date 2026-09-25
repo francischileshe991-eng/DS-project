@@ -36,6 +36,9 @@ public class MutualExclusion {
     // routine only regenerates once the ring has been genuinely silent for a grace period.
     private volatile int tokenGeneration = 0;
     private volatile long lastTokenActivityMs = System.currentTimeMillis();
+    private volatile int currentTokenHolder = -1;
+    private volatile int activeCsNode = -1;
+    private volatile int lastCsNode = -1;
 
     public static class ScoreUpdate {
         public final String player;
@@ -51,6 +54,7 @@ public class MutualExclusion {
         this.nodeId = nodeId;
         this.peers = new ArrayList<>(peers);
         this.hasToken = startsWithToken;
+        this.currentTokenHolder = startsWithToken ? nodeId : 0;
         this.scoreboard = scoreboard;
         this.executor = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "token-passer-" + nodeId);
@@ -86,10 +90,14 @@ public class MutualExclusion {
     }
 
     public synchronized void receiveToken(String scoresJson) {
-        receiveToken(scoresJson, -1);
+        receiveToken(scoresJson, -1, -1, -1);
     }
 
     public synchronized void receiveToken(String scoresJson, int incomingGen) {
+        receiveToken(scoresJson, incomingGen, -1, -1);
+    }
+
+    public synchronized void receiveToken(String scoresJson, int incomingGen, int lastCs, int activeCs) {
         if (incomingGen >= 0) {
             if (incomingGen < tokenGeneration) {
                 // A stale token from an older generation: drop it to avoid duplicates.
@@ -100,6 +108,9 @@ public class MutualExclusion {
             tokenGeneration = incomingGen;
         }
         this.hasToken = true;
+        this.currentTokenHolder = nodeId;
+        if (lastCs >= 0) this.lastCsNode = lastCs;
+        this.activeCsNode = -1;
         lastTokenActivityMs = System.currentTimeMillis();
         System.out.println("[TOKEN] Node " + nodeId + " received the token (gen " + tokenGeneration + ").");
         if (scoresJson != null && !scoresJson.isBlank()) {
@@ -117,15 +128,27 @@ public class MutualExclusion {
         if (!hasToken) return;
         boolean didWork = false;
         if (!pendingUpdates.isEmpty()) {
+            activeCsNode = nodeId;
+            lastCsNode = nodeId;
+            System.out.println(">>> [CRITICAL SECTION ENTERED] Node " + nodeId + " holds exclusive token lock <<<");
+
             // Critical Section: atomic execution on shared resource
             while (!pendingUpdates.isEmpty()) {
                 ScoreUpdate u = pendingUpdates.poll();
                 scoreboard.update(u.player, u.points);
-                System.out.println("[CS ENTERED] Node " + nodeId + " updated '" + u.player + "' +" + u.points);
+                System.out.println("[CS UPDATE] Node " + nodeId + " updated '" + u.player + "' +" + u.points);
                 didWork = true;
             }
             System.out.println("[CS EXITED] Node " + nodeId + " completed all pending CS operations. Updated Board:");
             System.out.print(scoreboard.report());
+
+            // Brief observable hold in CS (450ms) so dashboards, status endpoints, and human observers
+            // can visually observe the token held locally in critical section before it is passed
+            try {
+                Thread.sleep(450);
+            } catch (InterruptedException ignore) {}
+            activeCsNode = -1;
+            System.out.println(">>> [CRITICAL SECTION EXITED] Node " + nodeId + " released token lock <<<");
         }
         passToken(didWork);
     }
@@ -134,6 +157,8 @@ public class MutualExclusion {
         if (!hasToken) return;
         hasToken = false;
         String payload = "{\"token_holder\":" + nodeId + ",\"gen\":" + tokenGeneration
+                + ",\"last_cs_node\":" + lastCsNode
+                + ",\"active_cs_node\":" + activeCsNode
                 + ",\"scores\":" + scoreboard.toJson() + "}";
         executor.submit(() -> sendTokenAroundRing(payload, didWork));
     }
@@ -154,6 +179,7 @@ public class MutualExclusion {
             // Single node standalone mode
             synchronized (this) {
                 hasToken = true;
+                currentTokenHolder = nodeId;
                 lastTokenActivityMs = System.currentTimeMillis();
             }
             return;
@@ -167,6 +193,7 @@ public class MutualExclusion {
             if (NetworkClient.postTo(target.baseUrl, "/api/token", payload)) {
                 synchronized (this) {
                     lastTokenActivityMs = System.currentTimeMillis();
+                    currentTokenHolder = targetId;
                 }
                 if (step > 1) {
                     System.out.println("[TOKEN] Node " + nodeId + " bypassed offline nodes and passed token to "
@@ -184,6 +211,7 @@ public class MutualExclusion {
                 + ISOLATED_RETRY_DELAY_MS + "ms.");
         synchronized (this) {
             hasToken = true;
+            currentTokenHolder = nodeId;
             lastTokenActivityMs = System.currentTimeMillis();
         }
         try {
@@ -279,5 +307,17 @@ public class MutualExclusion {
 
     public long getLastTokenActivityMs() {
         return lastTokenActivityMs;
+    }
+
+    public int getCurrentTokenHolder() {
+        return currentTokenHolder;
+    }
+
+    public int getActiveCsNode() {
+        return activeCsNode;
+    }
+
+    public int getLastCsNode() {
+        return lastCsNode;
     }
 }

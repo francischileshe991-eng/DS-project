@@ -139,16 +139,22 @@ public class ChatHandler implements HttpHandler {
         String body = readBody(exchange);
         String scoresJson = null;
         int gen = -1;
+        int lastCs = -1;
+        int activeCs = -1;
         try {
             Map<String, Object> payload = Json.parse(body);
             Object scores = payload.get("scores");
             if (scores != null) scoresJson = Json.stringify(scores);
             Object g = payload.get("gen");
             if (g instanceof Number) gen = ((Number) g).intValue();
+            Object lcs = payload.get("last_cs_node");
+            if (lcs instanceof Number) lastCs = ((Number) lcs).intValue();
+            Object acs = payload.get("active_cs_node");
+            if (acs instanceof Number) activeCs = ((Number) acs).intValue();
         } catch (Exception ignore) {
             // No scores/generation payload carried
         }
-        mutex.receiveToken(scoresJson, gen);
+        mutex.receiveToken(scoresJson, gen, lastCs, activeCs);
         sendResponse(exchange, 200, "{\"status\":\"Token Handled\"}");
     }
 
@@ -188,7 +194,12 @@ public class ChatHandler implements HttpHandler {
                 + "\"vector\":" + Json.stringify(clock.getVectorClock()) + ","
                 + "\"leader\":" + election.getCurrentLeaderId() + ","
                 + "\"is_leader\":" + election.isLeader() + ","
+                + "\"is_electing\":" + election.isElectionInProgress() + ","
                 + "\"has_token\":" + mutex.hasToken() + ","
+                + "\"token_holder\":" + mutex.getCurrentTokenHolder() + ","
+                + "\"active_cs_node\":" + mutex.getActiveCsNode() + ","
+                + "\"last_cs_node\":" + mutex.getLastCsNode() + ","
+                + "\"pending_cs\":" + mutex.getPendingCount() + ","
                 + "\"token_gen\":" + mutex.getTokenGeneration() + ","
                 + "\"token_seen_ms\":" + mutex.getLastTokenActivityMs() + ","
                 + "\"messages\":" + log.snapshot().size()
