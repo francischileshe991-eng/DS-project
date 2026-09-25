@@ -516,20 +516,6 @@ public final class DashboardHtml {
       margin-top: 4px;
     }
 
-    .callout-box {
-      background: var(--surface-elevated);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 10px 14px;
-      font-size: 0.74rem;
-      color: var(--text-muted);
-      line-height: 1.45;
-      font-family: var(--mono);
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-    }
-    .callout-icon { color: var(--purple); font-size: 14px; }
 
     /* Operational Live Log */
     .ops-log {
@@ -724,10 +710,6 @@ public final class DashboardHtml {
         <div id="ops-log" class="ops-log">
           <div class="ops-log-item"><span style="color:var(--emerald);">●</span> Cluster online. Token circulating around ring.</div>
         </div>
-        <div class="callout-box">
-          <span class="callout-icon">ℹ</span>
-          <span><strong>Token Passing ≠ In Critical Section:</strong> Ring token circulates continuously to give access permission. Nodes only enter Critical Section when executing pending scoreboard mutations.</span>
-        </div>
       </div>
 
     </div>
@@ -881,11 +863,10 @@ public final class DashboardHtml {
           }
         } else {
           csChip.className = 'chip chip-cs-status';
-          const holder = (resStatus.token_holder !== undefined && resStatus.token_holder >= 0) ? resStatus.token_holder : '?';
-          csChip.innerHTML = '<span>● CS: Idle (Token at N' + holder + ')</span>';
+          csChip.innerHTML = '<span>● CS: Idle (Token Circulating)</span>';
           if (ringStatusBox) {
             ringStatusBox.className = 'ring-activity-status';
-            ringStatusBox.innerHTML = 'Token at <span style="color:var(--cyan); font-weight:600;">Node ' + holder + '</span>. Circulating passively (Idle Relay — No CS).';
+            ringStatusBox.innerHTML = 'Token circulating smoothly around ring. CS available on request.';
           }
         }
 
@@ -927,6 +908,21 @@ public final class DashboardHtml {
       let svgContent = '';
       // Base orbital track
       svgContent += `<circle cx="${centerX}" cy="${centerY}" r="${radius}" class="ring-orbit" />`;
+      // Smooth motion path for traveling key token (clockwise circle)
+      svgContent += `<path id="ring-track" d="M ${centerX} ${centerY - radius} A ${radius} ${radius} 0 1 1 ${centerX - 0.01} ${centerY - radius} Z" fill="none" stroke="none" />`;
+
+      // Smooth traveling Token Beacon with glowing Key icon 🔑
+      svgContent += `
+      <g>
+        <circle r="13" fill="rgba(168, 85, 247, 0.4)" stroke="#c084fc" stroke-width="1.8">
+          <animate attributeName="r" values="11;15;11" dur="1s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0.9;0.5;0.9" dur="1s" repeatCount="indefinite" />
+        </circle>
+        <text font-size="13" text-anchor="middle" dominant-baseline="central">🔑</text>
+        <animateMotion dur="4s" repeatCount="indefinite">
+          <mpath href="#ring-track"/>
+        </animateMotion>
+      </g>`;
 
       // Draw connection lines and nodes
       for (let i = 0; i < totalNodes; i++) {
@@ -936,7 +932,6 @@ public final class DashboardHtml {
 
         const isSelf = (i === MY_NODE_ID);
         const isLeader = (i === status.leader);
-        const isHolder = (status.token_holder === i);
         const isInsideCs = (status.active_cs_node === i);
         const isPending = (isSelf && status.pending_cs > 0);
         const isElecting = (isSelf && status.is_electing);
@@ -954,7 +949,7 @@ public final class DashboardHtml {
           strokeColor = '#f59e0b';
         }
 
-        // 1. Halo for Critical Section (Highest priority: glowing purple)
+        // 1. Halo for Critical Section (Glowing purple)
         if (isInsideCs) {
           svgContent += `<circle cx="${nx}" cy="${ny}" r="27" fill="rgba(168, 85, 247, 0.4)" stroke="#c084fc" stroke-width="3">
             <animate attributeName="r" values="22;32;22" dur="0.9s" repeatCount="indefinite" />
@@ -973,10 +968,6 @@ public final class DashboardHtml {
             <animate attributeName="r" values="18;26;18" dur="0.8s" repeatCount="indefinite" />
           </circle>`;
         }
-        // 4. Subtle beacon for Token Holder when idle
-        else if (isHolder) {
-          svgContent += `<circle cx="${nx}" cy="${ny}" r="22" fill="rgba(168, 85, 247, 0.2)" stroke="#a855f7" stroke-width="1.8" stroke-dasharray="2,2" />`;
-        }
 
         // Main node bubble
         svgContent += `<circle cx="${nx}" cy="${ny}" r="17" fill="${nodeColor}" stroke="${strokeColor}" stroke-width="2.5" />`;
@@ -993,29 +984,9 @@ public final class DashboardHtml {
           svgContent += `<text x="${nx}" y="${ny + 33}" font-family="var(--mono)" font-size="9" font-weight="700" fill="#e9d5ff" text-anchor="middle">🔑 IN CS</text>`;
         } else if (isPending) {
           svgContent += `<text x="${nx}" y="${ny + 33}" font-family="var(--mono)" font-size="8" font-weight="700" fill="#fcd34d" text-anchor="middle">⏳ WAITING</text>`;
-        } else if (isHolder) {
-          svgContent += `<text x="${nx}" y="${ny + 33}" font-family="var(--mono)" font-size="8" font-weight="700" fill="#c084fc" text-anchor="middle">🔑 TOKEN</text>`;
         } else if (isElecting) {
           svgContent += `<text x="${nx}" y="${ny + 33}" font-family="var(--mono)" font-size="8" font-weight="700" fill="#38bdf8" text-anchor="middle">⚡ ELECTING</text>`;
         }
-      }
-
-      // Traveling Key Beacon positioned at current Token Holder:
-      const activeHolder = (status.active_cs_node !== undefined && status.active_cs_node >= 0)
-          ? status.active_cs_node
-          : (status.token_holder !== undefined && status.token_holder >= 0 ? status.token_holder : -1);
-
-      if (activeHolder >= 0 && activeHolder < totalNodes) {
-        const hAngle = (activeHolder * (2 * Math.PI / totalNodes)) - (Math.PI / 2);
-        const kx = centerX + (radius - 23) * Math.cos(hAngle);
-        const ky = centerY + (radius - 23) * Math.sin(hAngle);
-        svgContent += `
-        <g transform="translate(${kx}, ${ky})">
-          <circle r="12" fill="rgba(168, 85, 247, 0.45)" stroke="#c084fc" stroke-width="1.5">
-            <animate attributeName="r" values="10;14;10" dur="1.2s" repeatCount="indefinite" />
-          </circle>
-          <text font-size="12" text-anchor="middle" dominant-baseline="central">🔑</text>
-        </g>`;
       }
 
       svg.innerHTML = svgContent;
